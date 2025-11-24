@@ -1,0 +1,53 @@
+
+services:
+  # --- Database ---
+  db:
+    image: postgres:15-alpine
+    container_name: app_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: appdb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # --- Backend (FastAPI) ---
+  backend:
+    build:
+      context: ./backend
+    container_name: app_backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/appdb
+      
+      GOOGLE_CLIENT_ID: 60209345033-dagb9pvr7maru9uq13i7ntoj4p513ls5.apps.googleusercontent.com
+      
+      JWT_SECRET: super-secret-change-me
+      ACCESS_EXPIRE_MINUTES: 15
+      REFRESH_EXPIRE_DAYS: 15
+
+      FRONTEND_ORIGIN: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  # --- Frontend (React + Nginx) ---
+  frontend:
+    build:
+      context: ./frontend
+    container_name: app_frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    # ❌ NEVER mount the frontend in production (breaks build)
+    # volumes:
+    #   - ./frontend:/app
+
+volumes:
+  db_data:
