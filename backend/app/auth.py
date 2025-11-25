@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import jwt
 from fastapi import HTTPException
 from google.oauth2 import id_token
@@ -22,18 +22,18 @@ def verify_google_token(token: str):
 
 def create_access_token(subject: str):
     """Creates a JWT access token for a given subject (e.g., user ID)."""
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_EXPIRE_MINUTES)
     payload = {"sub": subject, "exp": expire}
     
     # Encode the payload into a JWT
     token = jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
     
     # Return the token and its remaining lifetime in seconds
-    return token, int((expire - datetime.utcnow()).total_seconds())
+    return token, int((expire - datetime.now(timezone.utc)).total_seconds())
 
 def create_refresh_token(subject: str):
     """Creates a JWT refresh token for a given subject (e.g., user ID)."""
-    expire = datetime.utcnow() + timedelta(days=REFRESH_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_EXPIRE_DAYS)
     payload = {"sub": subject, "exp": expire}
     
     # Encode the payload into a JWT
