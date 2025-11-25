@@ -1,6 +1,5 @@
 import os # Add import for os, as it's often needed in FastAPI apps, even if not explicitly used here
 from fastapi import FastAPI, Depends, Request, Response, HTTPException
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from . import config, schemas, crud, auth
@@ -74,77 +73,19 @@ def google_login(
     return {"access": access, "expires_in": expires_in}
 
 
-# @app.post("/api/refresh", response_model=schemas.TokenResponse)
-# def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
-#     """
-#     Refreshes the access token using the refresh token stored in an HTTP-only cookie.
-#     """
-#     # 1. Get the refresh token from the cookie
-#     token = request.cookies.get(REFRESH_COOKIE_NAME)
-#     if not token:
-#         raise HTTPException(status_code=401, detail="No refresh token found in cookies")
-
-#     # 2. Decode the refresh token locally
-#     try:
-#         payload = auth.verify_local_token(token)
-#     except HTTPException:
-#         raise HTTPException(status_code=401, detail="Invalid refresh token format or expiration")
-
-#     email = payload.get("sub")
-
-#     # 3. Cross-check the token with the one stored in the database for validity
-#     user = crud.get_user_by_email(db, email)
-#     if not user or user.refresh_token != token:
-#         # Invalidate if user doesn't exist or token doesn't match DB (stale token)
-#         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
-
-#     # 4. If valid, issue a new short-lived access token
-#     access, expires_in = auth.create_access_token(email)
-#     return {"access": access, "expires_in": expires_in}
-
-# Add this import at the top
-
-
-@app.post("/api/auth/logout")
-def logout_user(request: Request, response: Response, db: Session = Depends(get_db)):
-    """
-    Logs out the user by clearing the refresh token from database and cookies.
-    """
-    # 1. Get the refresh token from the cookie
-    token = request.cookies.get(REFRESH_COOKIE_NAME)
-    
-    if token:
-        # 2. Find user with this refresh token and clear it
-        user = db.query(models.User).filter(models.User.refresh_token == token).first()
-        if user:
-            user.refresh_token = None
-            db.commit()
-    
-    # 3. Clear the refresh token cookie
-    response.delete_cookie(
-        key=REFRESH_COOKIE_NAME,
-        httponly=True,
-        samesite="lax",
-        secure=False  # Set to True in production
-    )
-    
-    return {"message": "Logged out successfully"}
-
-# ENHANCE THE EXISTING REFRESH ENDPOINT (Security Fix)
 @app.post("/api/refresh", response_model=schemas.TokenResponse)
 def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
     """
     Refreshes the access token using the refresh token stored in an HTTP-only cookie.
-    IMPROVED: Implements refresh token rotation for better security.
     """
     # 1. Get the refresh token from the cookie
-    old_token = request.cookies.get(REFRESH_COOKIE_NAME)
-    if not old_token:
+    token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not token:
         raise HTTPException(status_code=401, detail="No refresh token found in cookies")
 
     # 2. Decode the refresh token locally
     try:
-        payload = auth.verify_local_token(old_token)
+        payload = auth.verify_local_token(token)
     except HTTPException:
         raise HTTPException(status_code=401, detail="Invalid refresh token format or expiration")
 
@@ -152,34 +93,13 @@ def refresh_token(request: Request, response: Response, db: Session = Depends(ge
 
     # 3. Cross-check the token with the one stored in the database for validity
     user = crud.get_user_by_email(db, email)
-    if not user or user.refresh_token != old_token:
-        # Clear the invalid cookie
-        response.delete_cookie(REFRESH_COOKIE_NAME)
+    if not user or user.refresh_token != token:
+        # Invalidate if user doesn't exist or token doesn't match DB (stale token)
         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
 
-    # 4. CREATE NEW REFRESH TOKEN (Refresh Token Rotation - Security Best Practice)
-    new_refresh_token = auth.create_refresh_token(email)
-    user.refresh_token = new_refresh_token
-    db.commit()
-
-    # 5. Set the NEW refresh token in cookie
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=new_refresh_token,
-        httponly=True,
-        max_age=60 * 60 * 24 * config.REFRESH_EXPIRE_DAYS,
-        samesite="lax",
-        secure=False,
-    )
-
-    # 6. Create new access token
+    # 4. If valid, issue a new short-lived access token
     access, expires_in = auth.create_access_token(email)
-    
     return {"access": access, "expires_in": expires_in}
-
-
-
-
 
 
 @app.get("/api/me", response_model=schemas.UserOut)
@@ -214,7 +134,3 @@ def get_current_user_details(request: Request, db: Session = Depends(get_db)):
         
     # 5. Return safe user data
     return {"email": user.email, "name": user.name, "picture": user.picture}
-
-
-
-

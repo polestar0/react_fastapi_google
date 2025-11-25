@@ -26,11 +26,3 @@ class UserOut(BaseModel):
     email: str
     name: Optional[str] = None
     picture: Optional[str] = None
-
-
-# Add this to schemas.py
-class LogoutResponse(BaseModel):
-    """
-    Response model for logout operation.
-    """
-    message: str

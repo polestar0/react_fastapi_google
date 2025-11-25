@@ -1,0 +1,8 @@
+__pycache__/
+db_data/
+node_modules/
+venv/
+.env
+.env.local
+.idea/
+.vscode/

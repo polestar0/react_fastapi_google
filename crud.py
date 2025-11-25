@@ -54,23 +54,3 @@ def create_or_update_user(db: Session, email: str, name: str, picture: str, refr
     db.refresh(user)
     
     return user
-
-
-# Add this function to crud.py
-def clear_user_refresh_token(db: Session, email: str) -> bool:
-    """
-    Clears the refresh token for a user (on logout).
-    
-    Args:
-        db: The SQLAlchemy database session.
-        email: The email of the user to logout.
-        
-    Returns:
-        True if user was found and token cleared, False otherwise.
-    """
-    user = get_user_by_email(db, email)
-    if user:
-        user.refresh_token = None
-        db.commit()
-        return True
-    return False
